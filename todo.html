@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style type="text/css">
+
+        #container {
+            padding: 50px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 95%;
+            font-family: sans-serif;
+            /*width: fit-content*/
+        }
+
+        .todoBlock {
+            background-color: rgba(255, 176, 38, 0.15);
+            padding: 15px 0 0 0;
+            margin: 5px auto 5px 1em;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-family: sans-serif;
+            color: #0080a8;
+        }
+
+        .todoList .header input {
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #FFF;
+            width: 83%;
+            font-family: sans-serif;
+        }
+
+        .todoList .header button {
+            padding: 10px;
+            font-size: 16px;
+            margin: 10px 0 10px 10px;
+            background-color: #0066FF;
+            color: #FFF;
+            border: 2px solid #0066FF;
+        }
+
+        .todoList .header button:hover {
+            background-color: #003399;
+            border: 2px solid #003399;
+            cursor: pointer;
+        }
+
+        .todoItems {
+            padding: 0;
+        }
+
+        .todoItem {
+            color: #333;
+            background-color: rgba(255, 255, 255, .5);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            list-style: none;
+
+            transition: background-color .2s ease-out;
+        }
+
+        .sub {
+            background-color: rgba(216, 255, 190, 0.5);
+            padding-left: 2em;
+        }
+
+        .close {
+            display: inline-block;
+            position: relative;
+            z-index: 1;
+            padding: 0.2em;
+            margin: -0.2em;
+            margin-left: 0.2em;
+        }
+
+        .close:hover {
+            background: #bbb
+        }
+
+        .bottomBar {
+            background-color: #e9ecef;
+            overflow: hidden;
+            position: fixed;
+            bottom: 0;
+            left: -2em;
+            padding-left: 2em;
+            width: 110%;
+            z-index: 2;
+        }
+
+        .textInput {
+            font-family: sans-serif;
+            color: #0080a8;
+            font-size: 24px;
+            border: none;
+            background: transparent;
+            width: 70%;
+        }
+
+        .itemInput {
+            font-size: 14px;
+        }
+    </style>
+
+    <script src="./firebase-app.js"></script>
+    <script src="./firebase-auth.js"></script>
+    <script src="./firebase-firestore.js"></script>
+
+
+    <script src="./react.min.js"></script>
+    <script src="./react-dom.min.js"></script>
+    <script src="./babel.min.js"></script>
+    <link rel="stylesheet" href="./bootstrap.min.css">
+
+    <!-- animations -->
+    <script src="./react-flip-move.min.js"></script>
+
+    <!-- // test configs  -->
+    <script src="./test-configs.js"></script>
+
+</head>
+
+<body>
+<div id="container"></div>
+<script type="text/babel">
+
+    let useLocalConfig = true;
+    let dbInit = false;
+    let debug;
+
+    let app;
+    let mDbCollection;
+
+    // data model part
+    function NewItem(text, parentId) {
+        let now = getEclipseMilliseconds();
+        return {
+            id: getUniqueId(),
+            parentId: parentId,
+            nextId: 0,
+            position: now,
+            text: text.trim(),
+            note: "",
+            scope: "",
+            category: "",
+            priority: 0,
+            importance: 0,
+            easy: 0,
+            urgency: 0,
+            interest: 0,
+            completed: false,
+            canceled: false,
+            removed: false,
+            archivedTime: 0,
+            compulsory: false,
+            flag: "", // could be project, milestone
+            working: false,
+            planStart: 0,
+            planEnd: 0,
+            startTime: 0,
+            completeTime: 0,
+            repeat: 0,
+            lastRepeat: 0,
+            wait: false,
+            waitGap: 0,
+            lastRemind: 0,
+            created: now,
+            updated: now,
+            accessed: now,
+        };
+    }
+
+
+    // get time milliseconds
+    function getEclipseMilliseconds() {
+        let d = new Date();
+        return d.getTime();
+    }
+
+    // get unique id
+    function getUniqueId() {
+        let num = getEclipseMilliseconds() + Math.random();
+        return num.toString()
+    }
+
+    // database part
+    function getDbConfig(configs) {
+        if (configs == null) {
+            return null
+        }
+
+        configs = configs.replace("const firebaseConfig = {", "");
+        configs = configs.replace("};", "");
+        try {
+            return eval('({' + configs + '})');
+        } catch (err) {
+            console.log("Fail to parse db connection configs.");
+            return null;
+        }
+    }
+
+    function toColor(num) {
+        num = num * 10000;
+        num >>>= 0;
+        let b = num & 0xFF,
+            g = (num & 0xFF00) >>> 8,
+            r = (num & 0xFF0000) >>> 16,
+            a = 0.1 + (num / 100000);
+        if (a > 0.5) {
+            a = 0.5;
+        }
+        return "rgba(" + [r, g, b, a].join(",") + ")";
+    }
+
+    function getListByParent(preMap, aMap, id, level) {
+        level++;
+        aMap.forEach(e => {
+            if (e.parentId === id) {
+                e.level = level;
+                preMap.push(e);
+                preMap = getListByParent(preMap, aMap, e.id, level)
+            }
+        });
+        return preMap;
+    }
+
+    // set archive time of all items under a id
+    function iterateArchiveTime(collection, items, id, sec) {
+        items.map(e => {
+            if (e.id === id) {
+                e.archivedTime = sec;
+                collection.doc(id).set(e);
+            }
+            if (e.parentId === id) {
+                iterateArchiveTime(collection, items, e.id, sec)
+            }
+        })
+    }
+
+    function iterateDeleteItems(collection, items, id, sec) {
+        items.map(e => {
+            if (e.id === id) {
+                e.archivedTime = sec;
+                e.removed = true;
+                collection.doc(id).set(e);
+            }
+            if (e.parentId === id) {
+                iterateDeleteItems(collection, items, e.id, sec)
+            }
+        })
+    }
+
+    function editTextInput(text) {
+        return <input type="text" value={text}/>;
+    }
+
+    // // config form part
+    // class ConfigForm extends React.Component {
+    //     render() {
+    //         return (
+    //             <div class="card" style={{maxWidth: 400}}>
+    //                 <div class="card-body">
+    //                     <form onSubmit={this.props.handleSumbit}>
+    //                         <div className="form-group">
+    //                             <h1>Please input configs:</h1>
+    //                             <textarea className="form-control" rows="5"
+    //                                       onChange={this.props.getConfigs}/>
+    //                         </div>
+    //                         <button type="submit" className="btn btn-primary">Submit</button>
+    //                     </form>
+    //                 </div>
+    //             </div>
+    //         );
+    //     }
+    // }
+
+    // to do item part
+    class TodoItem extends React.Component {
+        constructor(props) {
+            super(props);
+            this.state = {
+                readOnly: true,
+                hasAddBar: false,
+            }
+        }
+
+        remove() {
+            this.props.remove(this.props.item.id);
+        }
+
+        clickItem(e) {
+            this.state.readOnly = false;
+            this.state.input.style.background = "#d8ffbe";
+            this.setState();
+        }
+
+        modifyItem(e) {
+            if (e.key === 'Enter') {
+                let text = this.state.input.value.trim();
+                if (text !== "") {
+                    this.props.item.text = text;
+                    let item = Object.assign({}, this.props.item);
+                    delete item.callback;
+                    delete item.level;
+                    app.modifyItem(item);
+                } else {
+                    this.state.input.value = this.props.item.text;
+                }
+                this.state.input.style.background = "";
+                this.setState();
+            }
+        }
+
+        add() {
+            this.state.hasAddBar = !this.state.hasAddBar;
+            this.setState();
+        }
+
+        closeAddBar() {
+            this.state.hasAddBar = false;
+            this.setState();
+        }
+
+        addSub(text) {
+            this.closeAddBar();
+            app.addSub(this.props.item.id, text);
+        }
+
+        complete(e) {
+            app.completeItem(this.props.item, e.target.checked);
+        }
+
+        render() {
+            let cName = "todoItem sub";
+            if (this.props.item.parentId === this.props.blockId) {
+                cName = "todoItem"
+            }
+            let bgColor = toColor(this.props.item.level);
+            // fix error of defaultValue keeping old value
+            if (this.state.input != null) {
+                this.state.input.defaultValue = this.props.item.text;
+            }
+            return (
+                <li className={cName} style={{backgroundColor: bgColor}}>
+                    <input type="checkbox" style={{marginRight: 10, width: 15, height: 15}}
+                           onClick={this.complete.bind(this)}/>
+                    <input type="text" className="textInput itemInput" ref={e => this.state.input = e}
+                           defaultValue={this.props.item.text}
+                           readOnly={this.state.readOnly}
+                           onKeyPress={this.modifyItem.bind(this)}
+                           onClick={this.clickItem.bind(this)}/>
+                    <span className="close" onClick={this.props.remove}>x</span>
+                    <span className="close" onClick={this.add.bind(this)}>+</span>
+                    {this.state.hasAddBar ? <InputBtn callbackFunc={this.addSub.bind(this)}/> : null}
+                </li>
+            )
+        }
+    }
+
+
+    class TodoItems extends React.Component {
+        constructor(props) {
+            super(props);
+            this.createTodoItems = this.createTodoItems.bind(this);
+            this.state = {
+                readOnly: true,
+            }
+        }
+
+        showAddBar() {
+            this.callback(this.id);
+        }
+
+        remove() {
+            app.archivedItem(this.id);
+        }
+
+        createTodoItems(item) {
+            return (
+                <TodoItem item={item} blockId={this.props.blockId} remove={this.remove.bind(item)}
+                          add={this.showAddBar.bind(item)}/>
+            )
+
+        }
+
+        render() {
+            let items = this.props.items.map(this.createTodoItems);
+
+            return (
+                <ul className="todoItems">
+                    {items}
+                </ul>
+            )
+        }
+    }
+
+
+    // // to do list part
+    // class To_do extends React.Component {
+    //     render() {
+    //         // console.log("to_do:", this.props);
+    //         return (
+    //             <div className="col-lg-4 col-md-4 col-sm-4 col-xs-12 todoBlock">
+    //                 {createInputBtn("New task", "Enter item", "Add", this.props.inputNewTaskChange, this.props.addTask)}
+    //                 <TodoItem items={this.props.items}/>
+    //             </div>
+    //         )
+    //     }
+    // }
+
+    function createInputBtn(label, placeholder, btnName, changeFunc, clickFunc) {
+        return (
+            <div className="input-group mb-3">
+                <input type="text" className="form-control" placeholder={placeholder}
+                       aria-label={label} aria-describedby={label}
+                       onChange={changeFunc}>
+                    <div className="input-group-append">
+                        <button className="btn btn-info" type="button"
+                                onClick={clickFunc}>{btnName}
+                        </button>
+                    </div>
+                </input>
+            </div>
+        )
+    }
+
+    class InputBtn extends React.Component {
+        constructor(props) {
+            super(props);
+            this.change = this.change.bind(this);
+            this.click = this.click.bind(this);
+            this.text = "";
+        }
+
+        componentDidMount() {
+            this.text.focus();
+        }
+
+        change(e) {
+            this.text = e.target.value;
+        }
+
+        click(e) {
+            e.preventDefault();
+            this.props.callbackFunc(this.text.value);
+            this.text.value = "";
+        }
+
+        enterKey(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.props.callbackFunc(this.text.value);
+                this.text.value = "";
+            }
+        }
+
+        render() {
+            return (
+                <div className="input-group mb-3">
+                    <input type="text" className="form-control" placeholder="Enter new item"
+                           aria-label="new item" aria-describedby="new item"
+                           onKeyPress={this.enterKey.bind(this)}
+                           ref={e => this.text = e}>
+                        <div className="input-group-append">
+                            <button className="btn btn-info" type="button"
+                                    onClick={this.click}>Add
+                            </button>
+                        </div>
+                    </input>
+                </div>
+            )
+        }
+    }
+
+    class TodoBlock extends React.Component {
+        constructor() {
+            super();
+            this.state = {
+                showBar: false,
+                readOnly: true,
+                input: null,
+            };
+            this.addSub = this.addSub.bind(this);
+            this.showAddBar = this.showAddBar.bind(this);
+            this.addingId = -1;
+        }
+
+        closeAddBar() {
+            this.addingId = -1;
+            this.state.showBar = false;
+            this.setState();
+        }
+
+        addSub(text) {
+            this.props.addSub(this.addingId, text);
+            this.closeAddBar();
+        }
+
+        showAddBar() {
+            this.showAddBarSub(this.props.item.id);
+        }
+
+        showAddBarSub(id) {
+            if (this.addingId === id) {
+                this.closeAddBar();
+            } else {
+                this.addingId = id;
+                this.state.showBar = true;
+                this.setState();
+            }
+        }
+
+        remove() {
+            app.archivedItem(this.props.item.id);
+        }
+
+        clickHeader() {
+            this.state.readOnly = false;
+            this.state.input.style.background = "#d8ffbe";
+            this.setState();
+        }
+
+        modifyHeader(e) {
+            if (e.key === 'Enter') {
+                let text = this.state.input.value.trim();
+                if (text !== "") {
+                    this.props.item.text = text;
+                    app.modifyItem(this.props.item);
+                } else {
+                    this.state.input.value = this.props.item.text;
+                }
+                this.state.input.style.background = "";
+                this.setState();
+            }
+        }
+
+        complete(e) {
+            app.completeItem(this.props.item, e.target.checked);
+        }
+
+        render() {
+            let d1 = new Date(this.props.item.created);
+            // let items = [];
+            // this.props.items.forEach(e => {
+            //     if (e.parentId === this.props.item.id) {
+            //         items.push(e);
+            //     }
+            // });
+            let blockId = this.props.item.id;
+            let items = getListByParent([], this.props.items, blockId, 0);
+            if (this.state.input != null) {
+                this.state.input.defaultValue = this.props.item.text;
+            }
+
+            return <div className="col-lg-4 todoBlock">
+                <div>
+                    <input type="checkbox" style={{marginRight: 10, width: 30, height: 30}}
+                           onClick={this.complete.bind(this)}/>
+                    <input type="text" className="textInput" ref={e => this.state.input = e}
+                           defaultValue={this.props.item.text}
+                           readOnly={this.state.readOnly}
+                           onKeyPress={this.modifyHeader.bind(this)}
+                           onClick={this.clickHeader.bind(this)}/>
+                    <span className="close" onClick={this.remove.bind(this)}>x</span>
+                    <span className="close" onClick={this.showAddBar}>+</span>
+                </div>
+                <p>{d1.getMonth() + "-" + d1.getDate()}</p>
+                <TodoItems blockId={blockId} items={items} addBarInBlock={this.showAddBarSub.bind(this)}/>
+                {this.state.showBar ? <InputBtn callbackFunc={this.addSub.bind(this)}/> : null}
+            </div>
+        }
+    }
+
+    // todo block part
+    function TodoBlocks(collection, items, addSubFunc) {
+        return items.map(e => {
+            if (e.parentId === 0) {
+                return <TodoBlock item={e} items={items} addSub={addSubFunc}/>
+            }
+        });
+    }
+
+    // bottom bar
+    class BottomBar extends React.Component {
+        render() {
+            return (
+                <div className="bottomBar">
+                    <p>@20191201 set start date; @20191201-20191202 set start and end date; </p>
+                </div>
+            );
+        }
+
+    }
+
+    // app part
+    class App extends React.Component {
+        constructor() {
+            super();
+            this.state = {
+                configs: '',
+                showConfigs: true,
+                items: [],
+                currentItem: {text: '', key: ''},
+            };
+            this.addSub = this.addSub.bind(this);
+            app = this;
+        }
+
+
+        setConfigs = e => {
+            this.configs = e.target.value;
+        };
+
+
+        submitConfig(e) {
+            e.preventDefault();
+            this.setState({showConfigs: false});
+            this.dbConfig = getDbConfig(this.configs);
+            // this.dbConfig = getDbConfig(getFirebaseConfigs());
+            this.initDb();
+        }
+
+        initDb() {
+            if (dbInit) {
+                return
+            }
+            firebase.initializeApp(this.dbConfig);
+            this.db = firebase.firestore();
+            this.collection = this.db.collection('todos');
+            mDbCollection = this.collection;
+
+            // get collection doc list
+            this.collection.where("archivedTime", "==", 0).get().then(snapshot => {
+                if (snapshot.empty) {
+                    console.log('No matching documents.');
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    this.state.items.push(doc.data());
+                });
+                this.setState(this.state.items);
+            }).catch(err => {
+                console.log('Error getting documents', err);
+            });
+            dbInit = true;
+        }
+
+        addProject(text) {
+            this.addSub(0, text)
+        }
+
+        modifyItem(item) {
+            this.collection.doc(item.id).set(item);
+        }
+
+        completeItem(item, isTrue) {
+            item.completed = isTrue;
+            if (isTrue) {
+                let now = getEclipseMilliseconds();
+                iterateArchiveTime(this.collection, this.state.items, item.id, now);
+            } else {
+                iterateArchiveTime(this.collection, this.state.items, item.id, 0);
+            }
+
+            // this.collection.doc(item.id).set(item);
+            // this.setState();
+        }
+
+        removeItem(id) {
+            let isYes = confirm("Are you sure to remove item?");
+            if (isYes) {
+                let relatedNodes = getListByParent([], this.state.items, id, 0);
+                relatedNodes.reverse();
+                relatedNodes.forEach(e1 => {
+                    this.removeSingleItem(e1.id);
+                });
+                this.removeSingleItem(id);
+                this.setState();
+            }
+        }
+
+        archivedItem(id) {
+            let isYes = confirm("Are you sure to remove item?");
+            if (isYes) {
+                let now = getEclipseMilliseconds();
+                iterateDeleteItems(this.collection, this.state.items, id, now);
+
+                let relatedNodes = getListByParent([], this.state.items, id, 0);
+                relatedNodes.reverse();
+                relatedNodes.forEach(e1 => {
+                    this.removeSingleItem(e1.id);
+                });
+                this.removeSingleItem(id);
+                this.setState();
+            }
+        }
+
+        removeSingleItem(id) {
+            let temp = [];
+            this.state.items.forEach(e => {
+                if (e.id !== id) {
+                    temp.push(e);
+                }
+            });
+            this.state.items = temp;
+            // this.collection.doc(id).delete();
+        }
+
+        addSub(parentId, text) {
+            if (text.trim() !== "") {
+                let newItem = NewItem(text, parentId);
+                this.state.items.push(newItem);
+                this.collection.doc(newItem.id).set(newItem);
+                // this.dbList.set({"list": this.state.items});
+                this.setState(this.state.items);
+            }
+        }
+
+        addTask(e) {
+            e.preventDefault();
+            if (this.newTask != null && this.newTask.trim() !== "") {
+                let newItem = NewItem(this.newTask.trim(), 0);
+                this.state.items.push(newItem);
+                this.collection.doc(newItem.id).set(newItem);
+                // this.dbList.set({"list": this.state.items});
+                this.setState(this.state.items);
+            }
+        }
+
+        inputNewTaskChange(e) {
+            this.newTask = e.target.value;
+        }
+
+        render() {
+            if (useLocalConfig) {
+                this.state.showConfigs = false;
+                this.dbConfig = getDbConfig(getFirebaseConfigs());
+                this.initDb();
+            }
+
+            return (
+                <div className="container-fluid">
+                    <InputBtn callbackFunc={this.addProject.bind(this)}/>
+                    <div className="row flex-row flex-nowrap">
+                        {TodoBlocks(this.collection, this.state.items, this.addSub)}
+                    </div>
+                </div>
+            )
+
+            //// with config form
+            // return (
+            //     <div>
+            //         {this.state.showConfigs ? <ConfigForm getConfigs={this.setConfigs.bind(this)}
+            //                                               handleSumbit={this.submitConfig.bind(this)}/> :
+            //             <Todo items={this.state.items} addTask={this.addTask.bind(this)}
+            //                   inputNewTaskChange={this.inputNewTaskChange.bind(this)}/>}
+            //     </div>
+            // )
+        }
+    }
+
+    //  JSX Babel code goes here
+    ReactDOM.render(
+        <App/>,
+        document.querySelector("#container"));
+</script>
+</body>
+
+</html>
