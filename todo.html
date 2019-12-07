@@ -133,7 +133,7 @@
 <div id="container"></div>
 <script type="text/babel">
 
-    let useLocalConfig = true;
+    let useLocalConfig = false;
     let dbInit = false;
     let debug;
 
@@ -263,25 +263,25 @@
         return <input type="text" value={text}/>;
     }
 
-    // // config form part
-    // class ConfigForm extends React.Component {
-    //     render() {
-    //         return (
-    //             <div class="card" style={{maxWidth: 400}}>
-    //                 <div class="card-body">
-    //                     <form onSubmit={this.props.handleSumbit}>
-    //                         <div className="form-group">
-    //                             <h1>Please input configs:</h1>
-    //                             <textarea className="form-control" rows="5"
-    //                                       onChange={this.props.getConfigs}/>
-    //                         </div>
-    //                         <button type="submit" className="btn btn-primary">Submit</button>
-    //                     </form>
-    //                 </div>
-    //             </div>
-    //         );
-    //     }
-    // }
+    // config form part
+    class ConfigForm extends React.Component {
+        render() {
+            return (
+                <div class="card" style={{maxWidth: 400}}>
+                    <div class="card-body">
+                        <form onSubmit={this.props.handleSumbit}>
+                            <div className="form-group">
+                                <h1>Please input configs:</h1>
+                                <textarea className="form-control" rows="5"
+                                          onChange={this.props.getConfigs}/>
+                            </div>
+                            <button type="submit" className="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+    }
 
     // to do item part
     class TodoItem extends React.Component {
@@ -748,14 +748,21 @@
                 this.initDb();
             }
 
-            return (
-                <div className="container-fluid">
-                    <InputBtn callbackFunc={this.addProject.bind(this)}/>
-                    <div className="row flex-row flex-nowrap">
-                        {TodoBlocks(this.collection, this.state.items, this.addSub)}
+            if (this.state.showConfigs) {
+                return (<div>
+                    <ConfigForm getConfigs={this.setConfigs.bind(this)}
+                                handleSumbit={this.submitConfig.bind(this)}/>
+                </div>)
+            } else {
+                return (
+                    <div className="container-fluid">
+                        <InputBtn callbackFunc={this.addProject.bind(this)}/>
+                        <div className="row flex-row flex-nowrap">
+                            {TodoBlocks(this.collection, this.state.items, this.addSub)}
+                        </div>
                     </div>
-                </div>
-            )
+                )
+            }
 
             //// with config form
             // return (
