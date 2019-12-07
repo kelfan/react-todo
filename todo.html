@@ -134,6 +134,7 @@
 <div id="container"></div>
 <script type="text/babel">
 
+    let CollectionName = 'todos';
     let useLocalConfig = false;
     let dbInit = false;
     let debug;
@@ -466,8 +467,8 @@
         }
 
         enterKey(e) {
-            e.preventDefault();
             if (e.key === 'Enter') {
+                e.preventDefault();
                 this.props.callbackFunc(this.text.value);
                 this.text.value = "";
             } else if (e.key === 'Escape') {
@@ -649,7 +650,7 @@
             }
             firebase.initializeApp(this.dbConfig);
             this.db = firebase.firestore();
-            this.collection = this.db.collection('todos');
+            this.collection = this.db.collection(CollectionName);
             mDbCollection = this.collection;
 
             // get collection doc list
