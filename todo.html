@@ -22,6 +22,7 @@
             background-color: rgba(255, 176, 38, 0.15);
             padding: 15px 0 0 0;
             margin: 5px auto 5px 1em;
+            min-width: 450px;
         }
 
         h1 {
@@ -112,9 +113,9 @@
         }
 
         .dateline {
-            margin: 0;
             font-size: 10px;
             font-style: italic;
+            margin: 0 2px 0 0;
         }
     </style>
 
@@ -374,9 +375,9 @@
             }
             return (
                 <li className={cName} style={{backgroundColor: bgColor}}>
-                    <p className="dateline">{formatDate(this.props.item.sortDate)} </p>
                     <input type="checkbox" style={{marginRight: 10, width: 15, height: 15}}
                            onClick={this.complete.bind(this)}/>
+                    <span className="dateline">{formatDate(this.props.item.sortDate)} </span>
                     <input type="text" className="textInput itemInput" ref={e => this.state.input = e}
                            defaultValue={this.props.item.text}
                            readOnly={this.state.readOnly}
