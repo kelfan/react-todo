@@ -140,6 +140,12 @@
     let app;
     let mDbCollection;
 
+    // init configs
+    if (typeof(InitConfigs) != "undefined") {
+        InitConfigs();
+    }
+
+
     // data model part
     function NewItem(text, parentId) {
         let now = getEclipseMilliseconds();
@@ -317,6 +323,8 @@
                 }
                 this.state.input.style.background = "";
                 this.setState();
+            } else if (e.key === 'Escape') {
+                this.closeAddBar();
             }
         }
 
@@ -456,9 +464,11 @@
         }
 
         enterKey(e) {
+            e.preventDefault();
             if (e.key === 'Enter') {
-                e.preventDefault();
                 this.props.callbackFunc(this.text.value);
+                this.text.value = "";
+            } else if (e.key === 'Escape') {
                 this.text.value = "";
             }
         }
@@ -540,6 +550,8 @@
                 }
                 this.state.input.style.background = "";
                 this.setState();
+            } else if (e.key === 'Escape') {
+                this.closeAddBar();
             }
         }
 
