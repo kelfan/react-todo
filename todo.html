@@ -110,6 +110,12 @@
             font-size: 14px;
             color: #000000;
         }
+
+        .dateline {
+            margin: 0;
+            font-size: 10px;
+            font-style: italic;
+        }
     </style>
 
     <script src="./firebase-app.js"></script>
@@ -272,6 +278,12 @@
         return <input type="text" value={text}/>;
     }
 
+    // date int
+    function formatDate(date) {
+        let d1 = new Date(date);
+        return d1.getMonth() + "-" + d1.getDate();
+    }
+
     // config form part
     class ConfigForm extends React.Component {
         render() {
@@ -362,6 +374,7 @@
             }
             return (
                 <li className={cName} style={{backgroundColor: bgColor}}>
+                    <p className="dateline">{formatDate(this.props.item.sortDate)} </p>
                     <input type="checkbox" style={{marginRight: 10, width: 15, height: 15}}
                            onClick={this.complete.bind(this)}/>
                     <input type="text" className="textInput itemInput" ref={e => this.state.input = e}
