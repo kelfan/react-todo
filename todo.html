@@ -108,6 +108,7 @@
 
         .itemInput {
             font-size: 14px;
+            color: #000000;
         }
     </style>
 
@@ -141,7 +142,7 @@
     let mDbCollection;
 
     // init configs
-    if (typeof(InitConfigs) != "undefined") {
+    if (typeof (InitConfigs) != "undefined") {
         InitConfigs();
     }
 
@@ -179,6 +180,7 @@
             wait: false,
             waitGap: 0,
             lastRemind: 0,
+            sortDate: now,
             created: now,
             updated: now,
             accessed: now,
