@@ -22,6 +22,7 @@
             background-color: rgba(255, 176, 38, 0.15);
             padding: 15px 0 0 0;
             margin: 5px auto 5px 1em;
+            min-width: 450px;
         }
 
         h1 {
@@ -108,6 +109,13 @@
 
         .itemInput {
             font-size: 14px;
+            color: #000000;
+        }
+
+        .dateline {
+            font-size: 10px;
+            font-style: italic;
+            margin: 0 2px 0 0;
         }
     </style>
 
@@ -133,12 +141,19 @@
 <div id="container"></div>
 <script type="text/babel">
 
+    let CollectionName = 'todos';
     let useLocalConfig = false;
     let dbInit = false;
     let debug;
 
     let app;
     let mDbCollection;
+
+    // init configs
+    if (typeof (InitConfigs) != "undefined") {
+        InitConfigs();
+    }
+
 
     // data model part
     function NewItem(text, parentId) {
@@ -173,6 +188,7 @@
             wait: false,
             waitGap: 0,
             lastRemind: 0,
+            sortDate: now,
             created: now,
             updated: now,
             accessed: now,
@@ -263,6 +279,57 @@
         return <input type="text" value={text}/>;
     }
 
+    // date int
+    function formatDate(date) {
+        let d1 = new Date(date);
+        return (d1.getMonth() + 1) + "-" + d1.getDate();
+    }
+
+    function processDate(text) {
+        let d = "";
+        let now = new Date();
+        if (text.length === 8) {
+            d = text.substring(0, 4) + " " + text.substring(4, 6) + " " + text.substring(6);
+        } else if (text.length === 4) {
+            d = now.getFullYear() + " " + text.substring(0, 2) + " " + text.substring(2);
+        } else if (text.length === 2) {
+            d = now.getFullYear() + " " + (now.getMonth() + 1) + " " + text;
+        }
+        return new Date(d).getTime();
+    }
+
+    function processText(item, text) {
+        let match = text.match(/#(\d+)-(\d+)/);
+        if (match != null) {
+            let dateText1 = match[1];
+            let start = processDate(dateText1);
+            item.planStart = start;
+            item.sortDate = start;
+
+            let dateText2 = match[2];
+            if (dateText1.length >= 4) {
+                if (dateText2.length === 2) {
+                    dateText2 = dateText1.substring(0, dateText1.length - 2) + dateText2;
+                } else if (dateText2.length === 4) {
+                    dateText2 = dateText1.substring(0, dateText1.length - 4) + dateText2;
+                }
+            }
+            item.planEnd = processDate(dateText2);
+            item.text = text.replace(match[0], "").trim();
+        } else {
+            match = text.match(/#(\d+)/);
+            if (match != null) {
+                let start = processDate(match[1]);
+                item.planStart = start;
+                item.sortDate = start;
+                item.planEnd = 0;
+            }
+            item.text = text.replace(match[0], "").trim();
+        }
+
+        return item;
+    }
+
     // config form part
     class ConfigForm extends React.Component {
         render() {
@@ -306,8 +373,13 @@
         modifyItem(e) {
             if (e.key === 'Enter') {
                 let text = this.state.input.value.trim();
+                if (text !== this.props.item.text) {
+                    this.props.item.updated = getEclipseMilliseconds();
+                }
                 if (text !== "") {
-                    this.props.item.text = text;
+                    // this.props.item.text = text;
+                    this.props.item = processText(this.props.item, text);
+                    this.state.input.value = this.props.item.text;
                     let item = Object.assign({}, this.props.item);
                     delete item.callback;
                     delete item.level;
@@ -317,6 +389,8 @@
                 }
                 this.state.input.style.background = "";
                 this.setState();
+            } else if (e.key === 'Escape') {
+                this.closeAddBar();
             }
         }
 
@@ -353,6 +427,7 @@
                 <li className={cName} style={{backgroundColor: bgColor}}>
                     <input type="checkbox" style={{marginRight: 10, width: 15, height: 15}}
                            onClick={this.complete.bind(this)}/>
+                    <span className="dateline">{formatDate(this.props.item.sortDate)} </span>
                     <input type="text" className="textInput itemInput" ref={e => this.state.input = e}
                            defaultValue={this.props.item.text}
                            readOnly={this.state.readOnly}
@@ -460,6 +535,8 @@
                 e.preventDefault();
                 this.props.callbackFunc(this.text.value);
                 this.text.value = "";
+            } else if (e.key === 'Escape') {
+                this.text.value = "";
             }
         }
 
@@ -532,14 +609,21 @@
         modifyHeader(e) {
             if (e.key === 'Enter') {
                 let text = this.state.input.value.trim();
+                if (text !== this.props.item.text) {
+                    this.props.item.updated = getEclipseMilliseconds();
+                }
                 if (text !== "") {
-                    this.props.item.text = text;
+                    // this.props.item.text = text;
+                    this.props.item = processText(this.props.item, text);
+                    this.state.input.value = this.props.item.text;
                     app.modifyItem(this.props.item);
                 } else {
                     this.state.input.value = this.props.item.text;
                 }
                 this.state.input.style.background = "";
                 this.setState();
+            } else if (e.key === 'Escape') {
+                this.closeAddBar();
             }
         }
 
@@ -548,7 +632,7 @@
         }
 
         render() {
-            let d1 = new Date(this.props.item.created);
+            let d1 = new Date(this.props.item.sortDate);
             // let items = [];
             // this.props.items.forEach(e => {
             //     if (e.parentId === this.props.item.id) {
@@ -573,7 +657,7 @@
                     <span className="close" onClick={this.remove.bind(this)}>x</span>
                     <span className="close" onClick={this.showAddBar}>+</span>
                 </div>
-                <p>{d1.getMonth() + "-" + d1.getDate()}</p>
+                <p>{formatDate(this.props.item.sortDate)}</p>
                 <TodoItems blockId={blockId} items={items} addBarInBlock={this.showAddBarSub.bind(this)}/>
                 {this.state.showBar ? <InputBtn callbackFunc={this.addSub.bind(this)}/> : null}
             </div>
@@ -635,7 +719,7 @@
             }
             firebase.initializeApp(this.dbConfig);
             this.db = firebase.firestore();
-            this.collection = this.db.collection('todos');
+            this.collection = this.db.collection(CollectionName);
             mDbCollection = this.collection;
 
             // get collection doc list
@@ -647,6 +731,15 @@
 
                 snapshot.forEach(doc => {
                     this.state.items.push(doc.data());
+                });
+                this.state.items.sort(function (a, b) {
+                    if (a.sortDate < b.sortDate) {
+                        return -1;
+                    }
+                    if (b.sortDate < a.sortDate) {
+                        return 1;
+                    }
+                    return 0;
                 });
                 this.setState(this.state.items);
             }).catch(err => {
@@ -719,6 +812,7 @@
         addSub(parentId, text) {
             if (text.trim() !== "") {
                 let newItem = NewItem(text, parentId);
+                newItem = processText(newItem, text);
                 this.state.items.push(newItem);
                 this.collection.doc(newItem.id).set(newItem);
                 // this.dbList.set({"list": this.state.items});
