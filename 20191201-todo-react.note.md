@@ -7,3 +7,4 @@
 - [ ] 20191204 remove this.props.remove in todo item
 - [ ] 20191206 exit by ESC key 
 - [ ] 20191207 display checked items 
+- [x] 20191208 check update time in delete item -> no need, archiveTime is the final update
