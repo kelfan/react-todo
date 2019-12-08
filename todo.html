@@ -282,7 +282,7 @@
     // date int
     function formatDate(date) {
         let d1 = new Date(date);
-        return d1.getMonth() + "-" + d1.getDate();
+        return (d1.getMonth() + 1) + "-" + d1.getDate();
     }
 
     function processDate(text) {
@@ -293,17 +293,19 @@
         } else if (text.length === 4) {
             d = now.getFullYear() + " " + text.substring(0, 2) + " " + text.substring(2);
         } else if (text.length === 2) {
-            d = now.getFullYear() + " " + now.getMonth() + " " + text;
+            d = now.getFullYear() + " " + (now.getMonth() + 1) + " " + text;
         }
-        return new Date(d);
+        return new Date(d).getTime();
     }
 
     function processText(item, text) {
-        // #\d+-\d+
+        console.log(text);
         let match = text.match(/#(\d+)-(\d+)/);
         if (match != null) {
             let dateText1 = match[1];
-            item.planStart = processDate(dateText1);
+            let start = processDate(dateText1);
+            item.planStart = start;
+            item.sortDate = start;
 
             let dateText2 = match[2];
             if (dateText1.length >= 4) {
@@ -313,17 +315,17 @@
                     dateText2 = dateText1.substring(0, dateText1.length - 4) + dateText2;
                 }
             }
-            console.log(dateText2);
             item.planEnd = processDate(dateText2);
+            item.text = text.replace(match[0], "").trim();
         } else {
-          match = text.match(/#(\d+)/);
-          if (match != null){
-              item.planStart = processDate(match[1]);
-          }
+            match = text.match(/#(\d+)/);
+            if (match != null) {
+                item.planStart = processDate(match[1]);
+            }
+            item.text = text.replace(match[0], "").trim();
         }
 
-
-        // #1201 #mmdd
+        console.log(item);
         return item;
     }
 
@@ -370,8 +372,13 @@
         modifyItem(e) {
             if (e.key === 'Enter') {
                 let text = this.state.input.value.trim();
+                if (text !== this.props.item.text) {
+                    this.props.item.updated = getEclipseMilliseconds();
+                }
                 if (text !== "") {
-                    this.props.item.text = text;
+                    // this.props.item.text = text;
+                    this.props.item = processText(this.props.item, text);
+                    this.state.input.value = this.props.item.text;
                     let item = Object.assign({}, this.props.item);
                     delete item.callback;
                     delete item.level;
@@ -601,8 +608,13 @@
         modifyHeader(e) {
             if (e.key === 'Enter') {
                 let text = this.state.input.value.trim();
+                if (text !== this.props.item.text) {
+                    this.props.item.updated = getEclipseMilliseconds();
+                }
                 if (text !== "") {
-                    this.props.item.text = text;
+                    // this.props.item.text = text;
+                    this.props.item = processText(this.props.item, text);
+                    this.state.input.value = this.props.item.text;
                     app.modifyItem(this.props.item);
                 } else {
                     this.state.input.value = this.props.item.text;
@@ -619,7 +631,7 @@
         }
 
         render() {
-            let d1 = new Date(this.props.item.created);
+            let d1 = new Date(this.props.item.sortDate);
             // let items = [];
             // this.props.items.forEach(e => {
             //     if (e.parentId === this.props.item.id) {
@@ -644,7 +656,7 @@
                     <span className="close" onClick={this.remove.bind(this)}>x</span>
                     <span className="close" onClick={this.showAddBar}>+</span>
                 </div>
-                <p>{d1.getMonth() + "-" + d1.getDate()}</p>
+                <p>{formatDate(this.props.item.sortDate)}</p>
                 <TodoItems blockId={blockId} items={items} addBarInBlock={this.showAddBarSub.bind(this)}/>
                 {this.state.showBar ? <InputBtn callbackFunc={this.addSub.bind(this)}/> : null}
             </div>
@@ -799,6 +811,7 @@
         addSub(parentId, text) {
             if (text.trim() !== "") {
                 let newItem = NewItem(text, parentId);
+                newItem = processText(newItem, text);
                 this.state.items.push(newItem);
                 this.collection.doc(newItem.id).set(newItem);
                 // this.dbList.set({"list": this.state.items});
