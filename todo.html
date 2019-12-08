@@ -299,7 +299,6 @@
     }
 
     function processText(item, text) {
-        console.log(text);
         let match = text.match(/#(\d+)-(\d+)/);
         if (match != null) {
             let dateText1 = match[1];
@@ -320,12 +319,14 @@
         } else {
             match = text.match(/#(\d+)/);
             if (match != null) {
-                item.planStart = processDate(match[1]);
+                let start = processDate(match[1]);
+                item.planStart = start;
+                item.sortDate = start;
+                item.planEnd = 0;
             }
             item.text = text.replace(match[0], "").trim();
         }
 
-        console.log(item);
         return item;
     }
 
