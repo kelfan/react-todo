@@ -323,8 +323,8 @@
                 item.planStart = start;
                 item.sortDate = start;
                 item.planEnd = 0;
+                item.text = text.replace(match[0], "").trim();
             }
-            item.text = text.replace(match[0], "").trim();
         }
 
         return item;
