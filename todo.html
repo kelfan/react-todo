@@ -299,6 +299,8 @@
     }
 
     function processText(item, text) {
+        item.text = text;
+
         let match = text.match(/#(\d+)-(\d+)/);
         if (match != null) {
             let dateText1 = match[1];
