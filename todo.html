@@ -299,7 +299,10 @@
     }
 
     function processText(item, text) {
-        item.text = text;
+        if (text !== item.text) {
+            item.updated = getEclipseMilliseconds();
+            item.text = text;
+        }
 
         let match = text.match(/#(\d+)-(\d+)/);
         if (match != null) {
