@@ -177,6 +177,7 @@
             removed: false,
             archivedTime: 0,
             compulsory: false,
+            highlight: false,
             flag: "", // could be project, milestone
             working: false,
             planStart: 0,
@@ -304,6 +305,14 @@
             item.text = text;
         }
 
+        // process highlight
+        if (text.includes("!!")) {
+            item.highlight = true;
+        } else {
+            item.highlight = false;
+        }
+
+        // process date
         let match = text.match(/#(\d+)-(\d+)/);
         if (match != null) {
             let dateText1 = match[1];
@@ -428,6 +437,10 @@
             if (this.state.input != null) {
                 this.state.input.defaultValue = this.props.item.text;
             }
+            if (this.props.item.highlight) {
+                bgColor = "Gold";
+            }
+
             return (
                 <li className={cName} style={{backgroundColor: bgColor}}>
                     <input type="checkbox" style={{marginRight: 10, width: 15, height: 15}}
