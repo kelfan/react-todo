@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style type="text/css">
+
+        #container {
+            padding: 50px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 95%;
+            font-family: sans-serif;
+            /*width: fit-content*/
+        }
+
+    </style>
+
+    <script src="./firebase-app.js"></script>
+    <script src="./firebase-auth.js"></script>
+    <script src="./firebase-firestore.js"></script>
+
+
+    <script src="./react.min.js"></script>
+    <script src="./react-dom.min.js"></script>
+    <script src="./babel.min.js"></script>
+    <link rel="stylesheet" href="./bootstrap.min.css">
+
+    <!-- animations -->
+    <script src="./react-flip-move.min.js"></script>
+
+    <!-- // configs  -->
+    <script src="configs.js"></script>
+
+</head>
+
+<body>
+<div id="container"></div>
+<script type="text/babel">
+
+    let app;
+    let mDb;
+    let mCollection;
+
+    if ( (typeof (firebaseConfig) == "undefined") ||  (typeof (firebaseCollection) == "undefined")){
+        throw new Error("Please set firebaseConfig and firebaseCollection in configs.js file.");
+    }
+
+    if (typeof (firebaseConfig) != "undefined") {
+        firebase.initializeApp(firebaseConfig());
+        mDb = firebase.firestore();
+        mCollection = mDb.collection(firebaseCollection());
+    }
+
+    // app part
+    class App extends React.Component {
+        constructor() {
+            super();
+            app = this;
+        }
+
+        render() {
+            return <p>hello</p>
+        }
+    }
+
+    //  JSX Babel code goes here
+    ReactDOM.render(
+        <App/>,
+        document.querySelector("#container"));
+</script>
+</body>
+
+</html>
